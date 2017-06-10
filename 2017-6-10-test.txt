@@ -1,0 +1,64 @@
+/*************************************************************************
+    > File Name: threadtest.c
+    > Author: chenkaixin
+    > Mail: chenkaixin_1024@sina.com 
+    > Created Time: Sat 10 Jun 2017 01:42:23 PM PDT
+ ************************************************************************/
+
+#include<stdio.h>
+#include<pthread.h>
+#include<unistd.h>
+#include<sys/types.h>
+
+int a=0;
+int re=1;
+void* funtest()
+{
+	//int b=*(int*)a;
+	a=5;
+	printf("funtest:pid=%d,tid=%u\n",getpid(),pthread_self());
+	printf("funtest:a=%d\n",a);
+//	pthread_exit(&re);
+
+	pthread_cancel(pthread_self());
+}
+
+
+int main()
+{
+//	int a=10;
+//	void* p=&a;
+//
+//	int* pa=p;
+
+//	int a=0;
+
+	pthread_t tid;
+	int ret=pthread_create(&tid,NULL,funtest,NULL);
+	if(ret!=0)
+	{
+		printf("pthread_create:%s\n",strerror(ret));
+		return -1;
+	}
+
+	sleep(5);
+	printf("main:pid=%d,tid=%u\n",getpid(),pthread_self());
+	printf("main:a=%d\n",a);
+
+	void* reval;
+	int r=pthread_join(tid,&reval);
+	if(r!=0)
+	{
+		printf("pthread_join:%s\n",strerror(r));
+		return -2;
+	}
+	else if(reval==PTHREAD_CANCELED)
+	{
+		printf("the funtest is canceled\n");
+		return 1;
+	}
+
+	printf("tid=%u,reval=%d\n",tid,*(int*)reval);
+
+	return 0; 
+}
