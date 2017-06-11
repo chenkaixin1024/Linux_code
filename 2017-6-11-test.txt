@@ -1,0 +1,123 @@
+/*************************************************************************
+    > File Name: threadtest.c
+    > Author: chenkaixin
+    > Mail: chenkaixin_1024@sina.com 
+    > Created Time: Sat 10 Jun 2017 01:42:23 PM PDT
+ ************************************************************************/
+
+#include<stdio.h>
+#include<pthread.h>
+#include<unistd.h>
+#include<sys/types.h>
+
+
+//pthread_t tid;
+//int a=0;
+//int re=1;
+//
+////char* str="sucess";
+//void* funtest()
+//{
+//	int j=pthread_detach(pthread_self());
+//	printf("%s\n",strerror(j));
+//	//int b=*(int*)a;
+//	a=5;
+//	printf("funtest:pid=%d,tid=%u\n",getpid(),pthread_self());
+////	printf("funtest:pid=%d,tid=%u\n",getpid(),tid);
+//	printf("funtest:a=%d\n",a);
+////	pthread_exit(&re);
+//
+////	pthread_t id=pthread_self();
+////	int i=pthread_cancel(id);
+////	printf("%s\n",strerror(i));
+////	pthread_exit(&re);
+//
+//	char* str="the fun exit";
+//	return (void*)str;
+//}
+//
+//
+//int main()
+//{
+////	int a=10;
+////	void* p=&a;
+////
+////	int* pa=p;
+//
+////	int a=0;
+//
+//	pthread_t tid;
+//	int ret=pthread_create(&tid,NULL,funtest,NULL);
+//	if(ret!=0)
+//	{
+//		printf("pthread_create:%s\n",strerror(ret));
+//		return -1;
+//	}
+//
+//	sleep(1);
+//	printf("main:pid=%d,tid=%u\n",getpid(),pthread_self());
+////	printf("main:pid=%d,tid=%u\n",getpid(),tid);
+//	printf("main:a=%d\n",a);
+//
+////	pthread_cancel(tid);
+//	void* reval;
+//	int r=pthread_join(tid,&reval);
+//	if(r!=0)
+//	{
+//		printf("pthread_join:%s\n",strerror(r));
+//		return -2;
+//	}
+//	else if(reval==PTHREAD_CANCELED)
+//	{
+//		printf("the funtest is canceled\n");
+//		return 1;
+//	}
+//
+//	printf("tid=%u,reval=%s\n",tid,(char*)reval);
+//
+//	return 0; 
+//}
+
+
+void* funtest(void* arg)
+{
+//	int ret=pthread_detach(pthread_self());
+//	printf("%s\n",strerror(ret));
+	printf("%s\n",(char*)arg);
+
+	printf("funtest:pid=%d,tid=%u\n",getpid(),pthread_self());
+
+	char* str="the funtest return";
+	return (void*)str;
+}
+
+
+int main()
+{
+	pthread_t tid;
+	int err=pthread_create(&tid,NULL,funtest,"the funtest is running...");
+	if(err!=0)
+	{
+		printf("pthread_create:%s\n",strerror(err));
+		return err;
+	}
+
+	printf("main:pid=%d,tid=%u\n",getpid(),pthread_self());
+
+//	sleep(1);
+	pthread_detach(tid);
+	void* retval;
+	int ret=pthread_join(tid,&retval);
+	printf("ret=%d\n",ret);
+	if(ret!=0)
+	{
+		printf("pthread_join:%s\n",strerror(ret));
+		return ret;
+	}
+
+	printf("retval=%s\n",(char*)retval);
+
+	return 0;
+}
+
+
