@@ -1,0 +1,128 @@
+/*************************************************************************
+    > File Name: mysleep.c
+    > Author: chenkaixin
+    > Mail: chenkaixin_1024@sina.com 
+    > Created Time: Wed 14 Jun 2017 02:11:59 AM PDT
+ ************************************************************************/
+
+#include<stdio.h>
+#include<signal.h>
+
+
+//void handler(int sig)
+//{
+//	;
+//}
+//
+//unsigned int mysleep(unsigned int time)
+//{
+//	alarm(time);
+//	struct sigaction act,oact;
+//	act.sa_handler=handler;
+//	act.sa_flags=0;
+//	sigemptyset(&act.sa_mask);
+//	sigaction(SIGALRM,&act,&oact);
+//	pause();
+//	unsigned int ret=alarm(0);
+//	sigaction(SIGALRM,&oact,NULL);
+//	return ret;
+//}
+//
+//
+//int main()
+//{
+//	int count=0;
+//	while(1)
+//	{
+//		count++;
+//		printf("the count is %d\n",count);
+//		mysleep(1);
+//	}
+//	return 0;
+//}
+
+
+
+void handler(int sig)
+{
+	;
+}
+
+unsigned int mysleep(unsigned int time)
+{
+
+	sigset_t set,oset;
+	sigemptyset(&set);
+	sigemptyset(&oset);
+	sigaddset(&set,SIGALRM);
+	sigprocmask(SIG_BLOCK,&set,&oset);
+
+	alarm(time);
+	struct sigaction act,oact;
+	act.sa_handler=handler;
+	act.sa_flags=0;
+	sigemptyset(&act.sa_mask);
+	sigaction(SIGALRM,&act,&oact);
+	sigsuspend(&oset);
+	unsigned int ret=alarm(0);
+	sigaction(SIGALRM,&oact,NULL);
+	return ret;
+}
+
+
+int main()
+{
+	int count=0;
+	while(1)
+	{
+		count++;
+		printf("the count is %d\n",count);
+		mysleep(1);
+	}
+	return 0;
+}
+
+
+#include<stdio.h>
+#include<signal.h>
+
+//void handler(int sig)
+//{
+//	printf("the signum is %d\n",sig);
+//}
+//
+//int main()
+//{
+//	int i=0;
+//	for(;i<32;i++)
+//	{
+//		signal(i,handler);
+//	}
+//
+//	while(1);
+//	return 0;
+//}
+//
+
+volatile int a=0;
+
+void handler(int sig)
+{
+	printf("the signal is %d\n",sig);
+	a=1;
+}
+
+int main()
+{
+	signal(2,handler);
+	while(!a);
+	{
+		printf("a=%d\n",a);
+	}
+	return 0;
+}
+
+
+
+
+
