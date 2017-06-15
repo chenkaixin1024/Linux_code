@@ -1,0 +1,52 @@
+/*************************************************************************
+    > File Name: mutex.c
+    > Author: chenkaixin
+    > Mail: chenkaixin_1024@sina.com 
+    > Created Time: Thu 15 Jun 2017 12:16:16 AM PDT
+ ************************************************************************/
+
+#include<stdio.h>
+#include<pthread.h>
+
+int g_a=0;
+pthread_mutex_t Mutex=PTHREAD_MUTEX_INITIALIZER;
+
+void* funtest(void* arg)
+{
+	int i=0;
+	for(;i<5000;i++)
+	{
+		pthread_mutex_lock(&Mutex);
+		int tmp=g_a;
+		printf("the ptheard tid is %u,the g_a is %d\n",pthread_self(),g_a);
+		g_a=tmp+1;
+		pthread_mutex_unlock(&Mutex);
+	}
+}
+
+int main()
+{
+	pthread_t tid1,tid2;
+//	pthread_mutex_init(&Mutex,NULL);
+
+	int err=pthread_create(&tid1,NULL,funtest,NULL);
+	if(err!=0)
+	{
+		printf("pthread_create:%s\n",strerror(err));
+		return -1;
+	}
+
+	err=pthread_create(&tid2,NULL,funtest,NULL);
+	if(err!=0)
+	{
+		printf("pthread_create:%s\n",strerror(err));
+		return -1;
+	}
+
+
+	pthread_join(tid1,NULL);
+	pthread_join(tid2,NULL);
+
+	printf("at last,g_a=%d\n",g_a);
+	return 0;
+}
