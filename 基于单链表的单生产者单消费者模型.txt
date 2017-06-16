@@ -1,0 +1,99 @@
+/*************************************************************************
+    > File Name: pc_list.c
+    > Author: chenkaixin
+    > Mail: chenkaixin_1024@sina.com 
+    > Created Time: Thu 15 Jun 2017 07:20:00 AM PDT
+ ************************************************************************/
+
+#include<stdio.h>
+#include<pthread.h>
+#include<stdlib.h>
+
+typedef struct list{
+	struct list* _next;
+	int _val;
+}Node,*pNode;
+
+pNode pHead=NULL;
+pthread_mutex_t Mutex=PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t needproduct=PTHREAD_COND_INITIALIZER;
+
+void* product(void* arg)
+{
+	pNode pcur=NULL;
+	while(1)
+	{
+		sleep(2);
+		int value=rand()%100;
+		pthread_mutex_lock(&Mutex);
+		if(pHead==NULL)
+		{
+//			printf("3\n");
+			pHead=(pNode)malloc(sizeof(Node));
+			pHead->_next=NULL;
+			pHead->_val=value;
+			pcur=pHead;
+		}
+		else
+		{
+//			printf("1\n");
+			pNode p=(pNode)malloc(sizeof(Node));
+			pcur->_next=p;
+			p->_val=value;
+			p->_next=NULL;
+			pcur=p;
+//			printf("...");
+		}
+		printf("producter:%d\n",value);
+//		printf("pHead->%d\n",pHead->_val);
+		pthread_mutex_unlock(&Mutex);
+		pthread_cond_signal(&needproduct);
+	}
+}
+
+void* consum(void* arg)
+{
+	while(1)
+	{
+//		printf("2\n");
+		sleep(1);
+		pthread_mutex_lock(&Mutex);
+//		printf("consumer\n");
+		while(pHead==NULL)
+		{
+			pthread_cond_wait(&needproduct,&Mutex);//pthread_cond_waitµ÷ÓÃÊ§°Ü
+		}
+//		printf("4\n");
+		printf("consumer:%d\n",pHead->_val);
+		pNode pcur=pHead;
+		pHead=pcur->_next;
+		free(pcur);
+
+		pthread_mutex_unlock(&Mutex);
+	}
+}
+
+
+int main()
+{
+	pthread_t tid1,tid2;
+	int err=pthread_create(&tid1,NULL,product,NULL);
+	if(err!=0)
+	{
+		printf("pthread_create product:%s\n",strerror(err));
+		return -1;
+	}
+
+	err=pthread_create(&tid2,NULL,consum,NULL);
+	if(err!=0)
+	{
+		printf("pthread_create consum:%s\n",strerror(err));
+		return -1;
+	}
+
+
+	pthread_join(tid1,NULL);
+	pthread_join(tid2,NULL);
+
+	return 0;
+}
