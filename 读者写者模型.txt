@@ -1,0 +1,120 @@
+/*************************************************************************
+    > File Name: rwlock.c
+    > Author: chenkaixin
+    > Mail: chenkaixin_1024@sina.com 
+    > Created Time: Sun 18 Jun 2017 02:44:55 AM PDT
+ ************************************************************************/
+
+#include<stdio.h>
+#include<pthread.h>
+
+pthread_rwlock_t lock;
+int buf=0;
+
+void* writer(void* arg)
+{
+	while(1)
+	{
+		pthread_detach(pthread_self());
+//		sleep(1);
+		int ret=pthread_rwlock_trywrlock(&lock);
+		sleep(1);
+		if(ret!=0)
+		{
+			printf("the writer is %u,waiting...\n",pthread_self());
+		}
+		else
+		{
+			buf++;
+			printf("the writer is %u,writer : buf=%d\n",pthread_self(),buf);
+			pthread_rwlock_unlock(&lock);
+		}
+		sleep(2);
+	}
+}
+
+
+void* reader(void* arg)
+{
+	while(1)
+	{
+		pthread_detach(pthread_self());
+//		sleep(2);
+		int ret=pthread_rwlock_tryrdlock(&lock);
+//		sleep(2);//读者优先----一直拿着锁
+		if(ret!=0)
+		{
+			printf("the reader is %u,waiting...\n",pthread_self());
+		}
+		else
+		{
+			printf("the reader is %u,reader : buf=%d\n",pthread_self(),buf);
+			pthread_rwlock_unlock(&lock);
+		}
+		sleep(1);
+	}
+}
+
+
+int main()
+{
+	pthread_t tid1,tid2;
+	pthread_rwlock_init(&lock,NULL);
+	int err=pthread_create(&tid1,NULL,writer,NULL);
+	if(err!=0)
+	{
+		printf("pthread_create:%s\n",strerror(err));
+		return -1;
+	}
+
+
+	err=pthread_create(&tid1,NULL,writer,NULL);
+	if(err!=0)
+	{
+		printf("pthread_create:%s\n",strerror(err));
+		return -1;
+	}
+
+
+	err=pthread_create(&tid2,NULL,reader,NULL);
+	if(err!=0)
+	{
+		printf("pthread_create:%s\n",strerror(err));
+		return -1;
+	}
+
+
+	err=pthread_create(&tid2,NULL,reader,NULL);
+	if(err!=0)
+	{
+		printf("pthread_create:%s\n",strerror(err));
+		return -1;
+	}
+
+//	int i=0;
+//	for(;i<3;i++)
+//	{
+//		int err=pthread_create(&tid1,NULL,writer,NULL);
+//		if(err!=0)
+//		{
+//			printf("pthread_create:%s\n",strerror(err));
+//			return -1;
+//		}
+//	}
+//
+//
+//	int j=0;
+//	for(;j<3;j++)
+//	{
+//		int err=pthread_create(&tid2,NULL,reader,NULL);
+//		if(err!=0)
+//		{
+//			printf("pthread_create:%s\n",strerror(err));
+//			return -1;
+//		}
+//	}
+
+	sleep(100);
+
+	return 0;
+}
