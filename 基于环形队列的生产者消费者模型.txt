@@ -1,0 +1,237 @@
+/*************************************************************************
+    > File Name: pc_rool.c
+    > Author: chenkaixin
+    > Mail: chenkaixin_1024@sina.com 
+    > Created Time: Fri 16 Jun 2017 01:23:55 AM PDT
+ ************************************************************************/
+
+#include<stdio.h>
+#include<pthread.h>
+#include<semaphore.h>
+#define MAX_PRODUCT 10
+
+//sem_t data_sem;
+//sem_t blank_sem;
+//int queue[MAX_PRODUCT];
+//
+//void init_queue()
+//{
+//	int i=0;
+//	for(;i<MAX_PRODUCT;i++)
+//	{
+//		queue[i]=0;
+//	}
+//}
+//
+//void P(sem_t* sem)
+//{
+//	sem_wait(sem);
+//}
+//
+//void V(sem_t* sem)
+//{
+//	sem_post(sem);
+//}
+//
+//void* product(void* arg)
+//{
+//	int idx=0;
+//	while(1)
+//	{
+//		sleep(2);
+//		P(&blank_sem);
+//		int value=rand()%100;
+//		queue[idx%MAX_PRODUCT]=value;
+//		idx++;
+//		printf("product:%d\n",value);
+//		V(&data_sem);
+//	}
+//}
+//
+//void* consum(void* arg)
+//{
+//	int idx=0;
+//	while(1)
+//	{
+//		sleep(1);
+//		P(&data_sem);
+//		int value=queue[idx%MAX_PRODUCT];
+//		idx++;
+//		printf("consum:%d\n",value);
+//		V(&blank_sem);
+//	}
+//}
+//
+//
+//int main()
+//{
+//	sem_init(&data_sem,0,0);
+//	sem_init(&blank_sem,0,MAX_PRODUCT);
+//	init_queue();
+//	pthread_t tid1,tid2;
+//	int err=pthread_create(&tid1,NULL,product,NULL);
+//	if(err!=0)
+//	{
+//		printf("pthread_create:%s\n",strerror(err));
+//		return -1;
+//	}
+//
+//	err=pthread_create(&tid2,NULL,consum,NULL);
+//	if(err!=0)
+//	{
+//		printf("pthread_create:%s\n",strerror(err));
+//		return -1;
+//	}
+//
+//
+//	pthread_join(tid1,NULL);
+//	pthread_join(tid2,NULL);
+//
+//	sem_destroy(&blank_sem);
+//	sem_destroy(&data_sem);
+//	return 0;
+//}
+
+
+sem_t data_sem;
+sem_t blank_sem;
+int queue[MAX_PRODUCT];
+
+void init_queue()
+{
+	int i=0;
+	for(;i<MAX_PRODUCT;i++)
+	{
+		queue[i]=0;
+	}
+}
+
+void P(sem_t* sem)
+{
+	sem_wait(sem);
+}
+
+void V(sem_t* sem)
+{
+	sem_post(sem);
+}
+
+pthread_mutex_t P_Mutex=PTHREAD_MUTEX_INITIALIZER;
+int p=0;
+
+void* product1(void* arg)
+{
+	int idx=0;
+	while(1)
+	{
+		sleep(2);
+		pthread_mutex_lock(&P_Mutex);
+		P(&blank_sem);
+		int value=rand()%100;
+		queue[p%MAX_PRODUCT]=value;
+		p++;
+		printf("product1:%d\n",value);
+		V(&data_sem);
+		pthread_mutex_unlock(&P_Mutex);
+	}
+}
+
+
+void* product2(void* arg)
+{
+	int idx=0;
+	while(1)
+	{
+		sleep(2);
+		pthread_mutex_lock(&P_Mutex);
+		P(&blank_sem);
+		int value=rand()%100;
+		queue[p%MAX_PRODUCT]=value;
+		p++;
+		printf("product2:%d\n",value);
+		V(&data_sem);
+		pthread_mutex_unlock(&P_Mutex);
+	}
+}
+
+pthread_mutex_t C_Mutex=PTHREAD_MUTEX_INITIALIZER;
+int c=0;
+
+void* consum1(void* arg)
+{
+	while(1)
+	{
+		sleep(1);
+		pthread_mutex_lock(&C_Mutex);
+		P(&data_sem);
+		int value=queue[c%MAX_PRODUCT];
+		c++;
+		printf("consum1:%d\n",value);
+		V(&blank_sem);
+		pthread_mutex_unlock(&C_Mutex);
+	}
+}
+
+void* consum2(void* arg)
+{
+	while(1)
+	{
+		sleep(1);
+		pthread_mutex_lock(&C_Mutex);
+		P(&data_sem);
+		int value=queue[c%MAX_PRODUCT];
+		c++;
+		printf("consum2:%d\n",value);
+		V(&blank_sem);
+		pthread_mutex_unlock(&C_Mutex);
+	}
+}
+
+int main()
+{
+	sem_init(&data_sem,0,0);
+	sem_init(&blank_sem,0,MAX_PRODUCT);
+	init_queue();
+	pthread_t tid1,tid2,tid3,tid4;
+	int err=pthread_create(&tid1,NULL,product1,NULL);
+	if(err!=0)
+	{
+		printf("pthread_create:%s\n",strerror(err));
+		return -1;
+	}
+
+	err=pthread_create(&tid2,NULL,product2,NULL);
+	if(err!=0)
+	{
+		printf("pthread_create:%s\n",strerror(err));
+		return -1;
+	}
+
+	err=pthread_create(&tid3,NULL,consum1,NULL);
+	if(err!=0)
+	{
+		printf("pthread_create:%s\n",strerror(err));
+		return -1;
+	}
+
+
+	err=pthread_create(&tid4,NULL,consum2,NULL);
+	if(err!=0)
+	{
+		printf("pthread_create:%s\n",strerror(err));
+		return -1;
+	}
+
+
+	pthread_join(tid1,NULL);
+	pthread_join(tid2,NULL);
+	pthread_join(tid3,NULL);
+	pthread_join(tid4,NULL);
+
+	sem_destroy(&blank_sem);
+	sem_destroy(&data_sem);
+	return 0;
+}
+
+
+
