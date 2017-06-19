@@ -1,0 +1,93 @@
+/*************************************************************************
+    > File Name: mysleep.c
+    > Author: chenkaixin
+    > Mail: chenkaixin_1024@sina.com 
+    > Created Time: Wed 14 Jun 2017 02:11:59 AM PDT
+ ************************************************************************/
+
+#include<stdio.h>
+#include<signal.h>
+
+
+//void handler(int sig)
+//{
+//	;
+//}
+//
+//unsigned int mysleep(unsigned int time)
+//{
+//	alarm(time);
+//	struct sigaction act,oact;
+//	act.sa_handler=handler;
+//	act.sa_flags=0;
+//	sigemptyset(&act.sa_mask);
+//	sigaction(SIGALRM,&act,&oact);
+//	pause();
+//	unsigned int ret=alarm(0);
+//	sigaction(SIGALRM,&oact,NULL);
+//	return ret;
+//}
+//
+//
+//int main()
+//{
+//	int count=0;
+//	while(1)
+//	{
+//		count++;
+//		printf("the count is %d\n",count);
+//		mysleep(1);
+//	}
+//	return 0;
+//}
+
+
+
+void handler(int sig)
+{
+//	printf("the signal is %d\n",sig);
+}
+
+unsigned int mysleep(unsigned int time)
+{
+
+	sigset_t set,oset;
+	sigemptyset(&set);
+	sigemptyset(&oset);
+	sigaddset(&set,SIGALRM);
+	sigprocmask(SIG_BLOCK,&set,&oset);
+
+//	alarm(time);
+
+//	while(1);
+	alarm(time);
+	struct sigaction act,oact;
+	act.sa_handler=handler;
+	act.sa_flags=0;
+	sigemptyset(&act.sa_mask);
+//	signal(SIGALRM,handler);
+	sigaction(SIGALRM,&act,&oact);
+	sigsuspend(&oset);
+	unsigned int ret=alarm(0);
+	sigaction(SIGALRM,&oact,NULL);
+	sigprocmask(SIG_SETMASK,&oset,NULL);
+	return ret;
+}
+
+
+int main()
+{
+//	mysleep(1);
+
+
+	int count=0;
+	while(1)
+	{
+		count++;
+		printf("the count is %d\n",count);
+		mysleep(1);
+	}
+	return 0;
+}
+
+
