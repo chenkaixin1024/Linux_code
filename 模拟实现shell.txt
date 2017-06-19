@@ -1,0 +1,83 @@
+/*************************************************************************
+    > File Name: Myshell.c
+    > Author: chenkaixin
+    > Mail: chenkaixin_1024@sina.com 
+    > Created Time: Thu 18 May 2017 09:16:44 PM PDT
+ ************************************************************************/
+
+#include<stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <ctype.h>
+#include <string.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+
+int main()
+{
+	while(1){
+	
+		pid_t pid=fork();
+		if(pid==0)
+		{
+			printf("[Myshell@localhost]$ ");
+			fflush(stdout);
+			char buf[1024];
+			ssize_t  readnum=read(0,buf,sizeof(buf)-1);
+			if(readnum>0)
+			{
+				buf[readnum-1]=0;//'\n'
+			}
+
+			char* start=buf;
+			char* argv[32];
+			memset(argv,0,32);
+			argv[0]=start;
+			ssize_t index=1;
+
+			while(*start)
+			{
+				if(isspace(*start))
+				{
+					*start='\0';
+					start++;
+					if(*start=='>')
+					{
+						start++;
+						while(isspace(*start))
+						{
+							start++;
+						}
+						char filename[32];
+						int idx=0;
+						while(!isspace(*start)&&*start!='\0')
+						{
+							filename[idx]=*start;
+							idx++;
+							start++;
+						}
+						filename[idx]='\0';
+						close(1);
+						int fd=open((const char*)filename,O_WRONLY|O_CREAT,0644);
+					}
+					else
+						argv[index++]=start;
+				}
+				else
+				{
+					start++;
+				}
+			}
+			argv[index]=NULL;
+			execvp(argv[0],argv);
+			exit(1);
+		}
+		else
+		{
+			waitpid(pid,NULL,0);
+		}
+
+	}
+	return 0;
+}
