@@ -1,0 +1,143 @@
+/*************************************************************************
+    > File Name: server.c
+    > Author: chenkaixin
+    > Mail: chenkaixin_1024@sina.com 
+    > Created Time: Mon 19 Jun 2017 07:17:02 PM PDT
+ ************************************************************************/
+
+#include<stdio.h>
+#include<sys/socket.h>
+#include<sys/types.h>
+#include<unistd.h>
+#include<netinet/in.h>
+#include<arpa/inet.h>
+#include<string.h>
+
+void usage()
+{
+	printf("the clicentpross [IPadress] [Portnum]\n");
+}
+
+int main(int argc,char* argv[])
+{
+	if(argc!=3)
+	{
+		usage();
+		return -1;
+	}
+
+	int sockfd=socket(AF_INET,SOCK_STREAM,0);
+	if(sockfd==-1)
+	{
+		perror("socket");
+		return 1;
+	}
+
+	struct sockaddr_in local;
+	memset(&local,0,sizeof(struct sockaddr_in));
+	local.sin_family=AF_INET;
+	local.sin_port=htons(atoi(argv[2]));
+	local.sin_addr.s_addr=inet_addr(argv[1]);
+
+	if(bind(sockfd,(struct sockaddr*)&local,sizeof(local))<0)
+	{
+		perror("bind");
+		return 2;
+	}
+
+	if(listen(sockfd,5)<0)
+	{
+		perror("listen");
+		return 3;
+	}
+
+	struct sockaddr_in client;
+	int client_len;
+	int newsockfd;
+	newsockfd=accept(sockfd,(struct sockaddr*)&client,&client_len);
+	if(newsockfd<0)
+	{
+		perror("accept");
+		return 4;
+	}
+
+	while(1)
+	{
+		char buf[1024];
+		int rd=read(newsockfd,buf,sizeof(buf));
+		if(rd>0)
+		{
+			buf[rd]=0;
+			printf("the client[ip:%s]:%s\n",inet_ntoa(client.sin_addr),buf);
+		}
+	}
+
+
+	return 0;
+}
+/*************************************************************************
+    > File Name: client.c
+    > Author: chenkaixin
+    > Mail: chenkaixin_1024@sina.com 
+    > Created Time: Mon 19 Jun 2017 07:17:02 PM PDT
+ ************************************************************************/
+
+#include<stdio.h>
+#include<sys/socket.h>
+#include<sys/types.h>
+#include<unistd.h>
+#include<netinet/in.h>
+#include<arpa/inet.h>
+#include<string.h>
+#include<stdlib.h>
+
+
+void usage()
+{
+	printf("the progress [IPadress] [Portnum]\n");
+}
+
+int main(int argc,char* argv[])
+{
+	if(argc!=3)
+	{
+		usage();
+		return -1;
+	}
+
+	int sockfd=socket(AF_INET,SOCK_STREAM,0);
+	if(sockfd==-1)
+	{
+		perror("socket");
+		return 1;
+	}
+
+	struct sockaddr_in server;
+	memset(&server,0,sizeof(struct sockaddr_in));
+	server.sin_family=AF_INET;
+	server.sin_port=htons(atoi(argv[2]));
+	server.sin_addr.s_addr=inet_addr(argv[1]);
+
+	if(connect(sockfd,(struct sockaddr*)&server,sizeof(server))<0)
+	{
+		perror("connect");
+		exit(1);
+	}
+
+	while(1)
+	{
+		printf("please enter:");
+		fflush(stdout);
+		char buf[1024];
+		int rd=read(0,buf,sizeof(buf));
+		if(rd>0)
+		{
+			buf[rd-1]=0;
+			printf("client->server:%s\n",buf);
+			int err=write(sockfd,buf,strlen(buf)+1);
+		//	printf("write:%d\n",err);
+		}
+	}
+
+	return 0;
+}
