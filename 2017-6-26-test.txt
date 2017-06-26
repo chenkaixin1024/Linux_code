@@ -1,0 +1,308 @@
+/*************************************************************************
+    > File Name: server_epoll.c
+    > Author: chenkaixin
+    > Mail: chenkaixin_1024@sina.com 
+    > Created Time: Thu 22 Jun 2017 11:48:37 PM PDT
+ ************************************************************************/
+
+#include<stdio.h>
+#include<sys/types.h>
+#include<sys/socket.h>
+#include<sys/epoll.h>
+#include<arpa/inet.h>
+#include<netinet/in.h>
+#include<stdlib.h>
+#include<string.h>
+#include<fcntl.h>
+#include<errno.h>
+
+#define BUFSIZE 1024
+
+
+
+typedef struct fdbuff{
+	int fd;
+	char* buf;
+}fdbuff_t,*fdbuff_p;
+
+static void alloc_fd(fdbuff_p fb,int fd)
+{
+	fb->fd=fd;
+	printf("alloc_fd:fd=%d\n",fb->fd);
+	fb->buf=(char*)malloc(BUFSIZE);
+	printf("fb->buf:%p\n",fb->buf);
+	if(fb->buf==NULL)
+	{
+		perror("malloc");
+		exit(5);
+	}
+}
+
+
+int myread(int fd,char* buf)
+{
+	int n=0;
+	int rd;
+	while((rd=read(fd,buf+n,BUFSIZE-1))>0)
+	{
+		if(rd>0)
+			n+=rd;
+	//	if(rd<0&&errno!=EAGAIN)
+	//	{
+	//		printf("buf:%s\n",buf);
+	//		perror("read");
+	//		exit(8);
+	//	}
+	}
+	return rd;
+}
+
+int mywrite(int fd,char* buf)
+{
+	int len=strlen(buf);
+	int size=len;
+	int wd=0;
+	while(size!=0)
+	{
+		wd=write(fd,buf+wd,len-wd);
+		if(wd>0)
+			size-=wd;
+		if(wd<0&&errno!=EAGAIN)
+		{
+			perror("write");
+			exit(9);
+		}
+	}
+	return wd;
+}
+
+
+void set_fd_unblock(int fd)
+{
+	printf("...................\n");
+	int fl=fcntl(fd,F_GETFL);
+	if(fl<0)
+	{
+		perror("fcntl");
+		return ;
+	}
+	if(fcntl(fd,F_SETFL,fl|O_NONBLOCK)<0)
+	{
+		perror("fcntl");
+		return ;
+	}
+}
+
+int myaccept(int fd,int epollfd)
+{
+	struct sockaddr_in client;
+	socklen_t len=sizeof(client);
+	int newsockfd;
+	while((newsockfd=accept(fd,(struct sockaddr*)&client,&len))>0)
+	{
+		if(newsockfd>0)
+		{
+			printf("client[ip:%s,port:%d] come...\n",\
+					inet_ntoa(client.sin_addr),ntohs(client.sin_port));
+
+			printf("newsockfd:%d\n",newsockfd);
+			set_fd_unblock(newsockfd);
+			struct epoll_event ev;
+			ev.events=EPOLLIN|EPOLLET;
+			fdbuff_t fb;
+			alloc_fd(&fb,newsockfd);
+			ev.data.ptr=(void*)&fb;
+			printf("accpt:buf:%p\n",((fdbuff_p)(ev.data.ptr))->buf);
+			printf("ev->ptr:%d\n",((fdbuff_p)(ev.data.ptr))->fd);
+			printf("newsockfd:%d\n",newsockfd);
+			epoll_ctl(epollfd,EPOLL_CTL_ADD,newsockfd,&ev);
+
+		}
+		
+		if(newsockfd<0&&errno!=EAGAIN)
+		{
+			perror("accept");
+			break;
+		}
+	}
+
+	return newsockfd;
+}	
+ 	
+ 	
+ 	
+static int startup(char* ip,int port)
+{	
+	int sockfd=socket(AF_INET,SOCK_STREAM,0);
+	if(sockfd<0)
+	{
+		perror("socket");
+		exit(1);
+	}
+
+	struct sockaddr_in local;
+	local.sin_family=AF_INET;
+	local.sin_port=htons(port);
+	local.sin_addr.s_addr=inet_addr(ip);
+	if(bind(sockfd,(struct sockaddr*)&local,sizeof(local))<0)
+	{
+		perror("bind");
+		exit(2);
+	}
+
+	if(listen(sockfd,5)<0)
+	{
+		perror("listen");
+		exit(3);
+	}
+
+	return sockfd;
+}
+
+
+static void usage(char* proc)
+{
+	printf("usage:%s [ip] [port]\n",proc);
+}
+
+
+int main(int argc,char* argv[])
+{
+	if(argc!=3)
+	{
+		usage(argv[0]);
+		exit(-1);
+	}
+
+	int listensock=startup(argv[1],atoi(argv[2]));
+	set_fd_unblock(listensock);
+	int epollfd=epoll_create(256);
+	if(epollfd<0)
+	{
+		perror("epoll_create");
+		exit(4);
+	}
+
+	printf("epollfd=%d,listensock=%d\n",epollfd,listensock);
+
+	fdbuff_t fb;
+	alloc_fd(&fb,listensock);
+
+
+	struct epoll_event _ev;
+	_ev.events=EPOLLIN;
+	_ev.data.ptr=(void*)&fb;
+
+	printf("_ev.events=%d\n",_ev.events);
+	if(epoll_ctl(epollfd,EPOLL_CTL_ADD,listensock,&_ev)<0)
+	{
+		perror("epoll_ctl");
+		exit(6);
+	}
+
+	while(1)
+	{
+		struct epoll_event rev[64];
+		int num=epoll_wait(epollfd,rev,64,-1);
+		int idx=0;
+		for(;idx<num;idx++)
+		{
+			fdbuff_p pt=(fdbuff_p)(rev[idx].data.ptr);
+			printf("rev:idx=%d,events:%d,fd:%d,buf:%p\n",idx,rev[idx].events,pt->fd,pt->buf);
+		}
+		switch(num)
+		{
+			case -1:{
+						perror("epoll_wait");
+						exit(7);
+					}break;
+			case 0:{
+					   printf("timeout...\n");
+				   }break;
+			default:{
+						int i=0;
+						printf("num=%d\n",num);
+						for(;i<num;i++)
+						{
+							printf("i=%d\n",i);
+							fdbuff_p p=(fdbuff_p)(rev[i].data.ptr);
+							int fd=p->fd;
+							printf("fd=%d\n",fd);
+							printf("events=%d\n",rev[i].events);
+							if(fd==listensock&&(rev[i].events&EPOLLIN))
+							{
+								printf("aaaaaaaaaaaaaaaaaaaa\n");
+								//struct sockaddr_in client;
+								//socklen_t len=sizeof(client);
+								//int newsockfd=accept(fd,(struct sockaddr*)&client,&len);
+								
+								myaccept(fd,epollfd);
+								//if(newsockfd<0)
+								//{
+								//	perror("accept");
+								//	continue;
+								//}
+
+								//printf("the client[%s:%d] come...\n",\
+								//		inet_ntoa(client.sin_addr),ntohs(client.sin_port));
+								//_ev.events=EPOLLIN;
+								//fdbuff_t fbf;
+								//alloc_fd(&fbf,newsockfd);
+								//_ev.data.ptr=(void*)&fbf;
+								//epoll_ctl(epollfd,EPOLL_CTL_ADD,newsockfd,&_ev);
+							}
+							else if(fd!=listensock&&(rev[i].events&EPOLLIN)\
+									/*&&(rev[i].events&EPOLLET)*/)
+							{
+								printf("bbbbbbbbbbbbbbbbbbbbbbb\n");
+								char* buf=((fdbuff_p)(rev[i].data.ptr))->buf;
+								printf("b:i=%d,buf:%p\n",i,buf);
+								buf[0]='a';
+								printf("read:fd=%d\n",fd);
+								int rd=myread(fd,buf);
+							//	printf("client: %s\n",buf);
+							//	_ev.events=EPOLLOUT|EPOLLET;
+							//	epoll_ctl(epollfd,EPOLL_CTL_MOD,fd,&_ev);
+
+								
+								if(rd>0)
+								{
+									buf[rd]=0;
+									printf("clinet: %s\n",buf);
+									_ev.events=EPOLLOUT|EPOLLET;
+									epoll_ctl(epollfd,EPOLL_CTL_MOD,fd,&_ev);
+								}
+								else if(rd==0)
+								{
+									printf("the client exit...\n");
+									epoll_ctl(epollfd,EPOLL_CTL_DEL,fd,NULL);
+									close(fd);
+									free(buf);
+								}
+								else
+								{
+									perror("read");
+									exit(8);
+								}
+							}
+							else if(fd!=listensock&&(rev[i].events&EPOLLOUT)\
+									/*&&(rev[i].events&EPOLLET)*/)
+							{
+								char* buf=p->buf;
+								char* msg="HTTP/1.1 200 OK\r\nComtent-length: 11\r\n\r\nhello epoll";
+								strcpy(buf,msg);
+								mywrite(fd,buf);
+								_ev.events=EPOLLIN|EPOLLET;
+								epoll_ctl(epollfd,EPOLL_CTL_MOD,fd,&_ev);
+								//close(fd);
+								//free(buf);
+							}
+						}
+					}break;
+		}
+	}
+
+
+
+	return 0;
+}
