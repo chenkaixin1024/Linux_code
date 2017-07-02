@@ -1,0 +1,23 @@
+#!/bin/bash
+
+i=0
+str=''
+arr=("|" "/" "-" "\\")
+index=0
+while [ $i -le 100 ]
+do
+	printf "[\033[5m\033[31m\033[47m\033[?25l\033[1m%-100s\033[0m][%d%%][%c]\r" "$str" "$i" "${arr[index]}"
+	str=$str'#'
+	let index++
+	let index%=4
+	let i++
+#	sleep 1
+	usleep 30000
+done
+
+printf "\n"
+
+
+#str='abcdefg'
+#printf "\033[5m\033[31m\033[47m\033[?25l%s\n" "$str"
+#printf "\033[0m"
