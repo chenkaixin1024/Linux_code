@@ -1,0 +1,59 @@
+#!/bin/bash
+
+#(cd ..;pwd;ls -l)
+#ls -l
+
+#echo "shell"
+#num="haha"
+#
+#env
+#set
+
+#export ENV='hello env'
+#
+#env | grep -E --color 'ENV'
+
+
+#str='hello world'
+#echo `echo $str`
+#echo $(echo $str)
+#echo `echo \\$str`
+#echo `echo \$str`
+#echo $(echo \$str)
+#echo `date`
+
+#str='\`date\`'
+#echo $str
+
+
+#echo '$SHELL'
+#echo 'abc\
+#def'
+#echo "\$SHELL"
+#echo "abc\
+#def"
+#echo "`ls`"
+#echo '`ls`'
+
+
+#test -d test
+#echo $?
+
+#i=5
+#if [ $i -gt 0 ];then
+#	if [ $i -le 5 ];then
+#		echo '0<i<=5'
+#	fi
+#else
+#	echo 'i<0'
+#fi
+
+read val
+case $val in
+	a|b )
+		echo "val=a|b";;
+	c )
+		echo "val=c";;
+	* )
+		echo "val=other";;
+esac
