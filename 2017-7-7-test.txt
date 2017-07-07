@@ -1,0 +1,343 @@
+--------------------------httpd.h-------------------------------------
+#ifndef _HTTPD_H_
+#define _HTTPD_H_
+
+#include <stdio.h>
+#include <sys/socket.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <stdlib.h>
+#include <string.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <errno.h>
+#include <unistd.h>
+#include <fcntl.h>
+
+#define SUCESS 0
+#define NOTICE 1
+#define WARNING 2
+#define ERROR 3
+#define FATAL 4
+#define SIZE 1024
+
+
+int startup(char* ip,int port);
+void print_log(const char* err,int level);
+void* handler(void* arg);
+
+
+
+#endif
+--------------------------httpd.c-------------------------------------
+#include "httpd.h"
+
+
+void print_log(const char* err,int level)
+{
+#ifdef _STDOUT_
+	const char* level_msg[]={
+		"SUCESS"
+		"NOTICE",
+		"WARNING",
+		"ERROR",
+		"FATAL"
+	};
+	
+	printf("[%s][%s]\n",err,level_msg);
+#endif
+
+}
+
+int startup(char* ip,int port)
+{
+	int sockfd=socket(AF_INET,SOCK_STREAM,0);
+	if(sockfd<0)
+	{
+		print_log(strerror(errno),FATAL);
+		exit(2);
+	}
+
+	struct sockaddr_in local;
+	local.sin_family=AF_INET;
+	local.sin_port=htons(port);
+	local.sin_addr.s_addr=inet_addr(ip);
+	socklen_t len=sizeof(local);
+
+	int opt=1;
+	setsockopt(sockfd,SOL_SOCKET,SO_REUSEADDR,&opt,sizeof(opt));
+	if(bind(sockfd,(struct sockaddr*)&local,len)<0)
+	{
+		print_log(strerror(errno),FATAL);
+		exit(3);
+	}
+
+	if(listen(sockfd,5)<0)
+	{
+		print_log(strerror(errno),FATAL);
+		exit(4);
+	}
+
+	return sockfd;
+
+}
+
+void echo_string(int sock)
+{}
+
+
+int get_line(int sockfd,char line[],int size)
+{
+	int len=0;
+	char c='\0';
+	while(c!='\n'&&len<size-1)
+	{
+		int rd=recv(sockfd,&c,1,0);
+		if(rd>0)
+		{
+			if(c=='\r')
+			{
+				int r=recv(sockfd,&c,1,MSG_PEEK);
+				if(r>0)
+				{
+					if(c=='\n')
+					{
+						recv(sockfd,&c,1,0);
+					}
+					else
+					{
+						c='\n';
+					}
+				}
+			}
+			line[len++]=c;
+		}
+		else
+		{
+			c='\n';
+		}
+	}
+	line[len]='\0';
+	return len;
+}
+
+void execgi(int sock,char* path,char* method,char* query_str)
+{}
+
+void dropheader(int sock)
+{
+	char line[SIZE];
+	int ret=-1;
+	do{
+		ret=get_line(sock,line,sizeof(line));
+	}while(ret>0&&strcmp(line,"\n"));
+}
+
+static int echowww(int sock,char* path,int size)
+{
+	int fd=open(path,O_RDONLY);
+	if(fd<0)
+	{
+		echo_string(sock);
+		print_log(strerror(errno),FATAL);
+		return 8;
+	}
+
+	char* echo_line="HTTP/1.0 200 OK\r\n";
+	send(sock,echo_line,strlen(echo_line),0);
+	char* echo_null="\r\n";
+	send(sock,echo_null,strlen(echo_null),0);
+
+	if(sendfile(sock,fd,NULL,size)<0)
+	{
+		echo_string(sock);
+		print_log(strerror(errno),FATAL);
+		close(fd);
+		return 9;
+	}
+
+	close(fd);
+	return 0;
+}
+
+
+void* handler(void* arg)
+{
+	int sockfd=(int)arg;
+#ifdef _DEBUG_
+	char line[1024];
+	while(1)
+	{
+		int ret=get_line(sockfd,line,sizeof(line));
+		if(ret>0)
+		{
+			printf("%s",line);
+		}
+		else
+		{
+			break;
+		}
+	}
+#else
+	int ret=0;
+	char buf[SIZE];
+	int r=get_line(sockfd,buf,sizeof(buf));
+	if(r<=0)
+	{
+		echo_string(sockfd);
+		ret=5;
+		goto end;
+	}
+
+	char method[SIZE/10];
+	int i=0;
+	int j=0;
+	int cgi=0;
+	while(!isspace(buf[i])&&i<sizeof(buf)&&j<sizeof(method)-1)
+	{
+		method[j]=buf[i];
+		j++;
+		i++;
+	}
+	method[j]=0;
+
+	if(strcasecmp(method,"POST")&&strcasecmp(method,"GET"))
+	{
+		echo_string(sockfd);
+		ret=6;
+		goto end;
+	}
+
+	if(strcasecmp(method,"POST")==0)
+	{
+		cgi=1;
+	}
+
+	char url[SIZE];
+	while(isspace(buf[i])&&i<sizeof(buf))
+	{
+		i++;
+	}
+
+	j=0;
+	while(!isspace(buf[i])&&i<sizeof(buf)&&j<sizeof(url)-1)
+	{
+		url[j]=buf[i];
+		i++;
+		j++;
+	}
+	url[j]=0;
+
+	char* query_str=url;
+	while(*query_str!='\0')
+	{
+		if(*query_str=='?')
+		{
+			*query_str='\0';
+			cgi=1;
+			query_str++;
+			break;
+		}
+		query_str++;
+	}
+	
+	char path[SIZE];
+	sprintf(path,"wwwroot%s",url);
+
+	if(path[strlen(path)-1]=='/')// '/'
+	{
+		strcat(path,"index.html");
+	}
+
+	struct stat st;
+	if(stat(path,&st)<0)
+	{
+		echo_string(sockfd);
+		ret=7;
+		goto end;
+	}
+	else
+	{
+		if(S_ISDIR(st.st_mode))
+		{
+			strcat(path,"/index.html");
+		}
+		else if((st.st_mode&S_IXUSR)\
+				||(st.st_mode&S_IXGRP)\
+				||(st.st_mode&S_IXOTH))
+		{
+			cgi=1;
+		}
+		else
+		{}
+	}
+
+	if(cgi)
+	{
+		execgi(sockfd,path,method,query_str);
+	}
+	else
+	{
+		dropheader(sockfd);
+		echowww(sockfd,path,st.st_size);
+	}
+
+
+end:
+	printf("the client exit...\n");
+	close(sockfd);
+	return (void*)ret;
+
+#endif
+}
+
+-----------------------------main.c------------------------------------
+
+#include "httpd.h"
+#include <pthread.h>
+
+
+void usage(char* proc)
+{
+	printf("usage:%s [ip] [port]\n",proc);
+}
+
+int main(int argc,char* argv[])
+{
+	if(argc!=3)
+	{
+		usage(argv[0]);
+		return 1;
+	}
+
+	int listensock=startup(argv[1],atoi(argv[2]));
+
+	while(1)
+	{
+		struct sockaddr_in client;
+		socklen_t len=sizeof(client);
+
+		int newfd=accept(listensock,(struct sockaddr*)&client,&len);
+		if(newfd<0)
+		{
+			print_log(strerror(errno),NOTICE);
+			continue;
+		}
+
+		printf("client[ip:%s] come...\n",inet_ntoa(client.sin_addr));
+		pthread_t tid;
+		int err=pthread_create(&tid,NULL,handler,(void*) newfd);
+		if(err!=0)
+		{
+			print_log(strerror(errno),WARNING);
+			close(newfd);
+		}
+		else
+		{
+			pthread_detach(tid);
+		}
+
+	}
+
+	return 0;
+}
